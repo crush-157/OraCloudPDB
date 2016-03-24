@@ -1,44 +1,26 @@
 
 ## Plug Swingbench Pluggable Database into 12c Cloud Container ##
 
-Simple 101 Example based around "SWB1" pluggable database
+Simple 101 Example based around "SWB1" pluggable database.  This is a TDE encrypted database (TDE encryption is enabled by default for Oracle Cloud databases)
 
 ### Prerequisites ###
 + Copy Datafiles into place
  	- Sample Swingbench Database "SWB1" used in this guide
- 	- Linux zipped tar file, split into 4 pieces to allow faster scp over networks with poor latency
 + Export Keys from Source Database - need the Pluggable Database Keys not just CDB keys
-	- this is pre-prepared for the example in this guide
+	- Copy the wallet file from the source if plugging into another container
 + Need a prepared XML pluggable database manifest
 	- this is pre-prepared for the example in this guide
 
 ### Copy Files in Place ###
 
-**Windows Terminal**
-```
-pscp.exe SWB1.tar.gz.000 oracle@EdTrainingDemoHost:/u02/app/oracle/oradata/
-pscp.exe SWB1.tar.gz.001 oracle@EdTrainingDemoHost:/u02/app/oracle/oradata/
-pscp.exe SWB1.tar.gz.002 oracle@EdTrainingDemoHost:/u02/app/oracle/oradata/
-pscp.exe SWB1.tar.gz.003 oracle@EdTrainingDemoHost:/u02/app/oracle/oradata/
-
-pscp.exe export_keys_swb1.exp oracle@EdTrainingDemoHost:/home/oracle/
-pscp.exe SWB1.XML oracle@EdTrainingDemoHost:/home/oracle/
-```
-
-**Linux Cloud VM Host**
-```
-oracle $> cd /u02/app/oracle/oradata/
-oracle $> cat SWB1.tar.gz.0* > SWB1.tar.gz
-oracle $> gunzip SWB1.tar.gz
-oracle $> rm SWB1.tar.gz.0*
-oracle $> tar -xvf SWB1.tar
-oracle $> rm SWB1.tar
-```
+scp etc...
 
 Example - changing the data-file path in the XML manifest:
 ```
 cat SWB1.XML | sed 's_/u02/app/oracle/oradata/SWB1_/u01/app/oracle/oradata/MYDB1_' > SWB1b.XML
 ```
+(change the path as appropriate for different directory-path destinations)
+
 
 ### Plug Database In ###
 ``` {SQL}
@@ -82,15 +64,15 @@ ELSE, If using **WALLET_TYPE=PASSWORD** key store, close it using syntax below:
 -- Make sure we are in the Root Container
 ALTER SESSION SET CONTAINER = CDB$ROOT;
 -- Close the root key-store
-administer key management set keystore close identified by "Welc#me1";
+ADMINISTER KEY MANAGEMENT SET KEYSTORE CLOSE IDENTIFIED BY "Welc#me1";
 ```
 Replace the key-store password used in the example as appropriate - this was set up when the key-store was created during Cloud VM Provisioning.
 
 
 Now, **Open** the **Container Root Keystore** as **WALLET_TYPE=PASSWORD**
 ``` {SQL}
-administer key management set keystore open identified by "Welc#me1";
-select * from v$encryption_wallet;
+ADMINISTER KEY MANAGEMENT SET KEYSTORE OPEN IDENTIFIED BY "Welc#me1";
+SELECT * FROM v$encryption_wallet;
 ```
 
 EG
@@ -107,7 +89,7 @@ Next, **Open** the **Pluggable Database Keystore**:
 --Switch to Container 
 ALTER SESSION SET CONTAINER = SWB1;
 -- Open the Key-Store
-administer key management set keystore open identified by "Welc#me1";
+ADMINISTER KEY MANAGEMENT SET KEYSTORE OPEN IDENTIFIED BY "Welc#me1";
 ```
 
 Replace the key-store password used in the example as appropriate - this was set up when the key-store was created during Cloud VM Provisioning.
@@ -117,7 +99,7 @@ Replace the key-store password used in the example as appropriate - this was set
 
 ``` {SQL}
 ALTER SESSION SET CONTAINER = cdb$ROOT;
-alter pluggable database SWB1 open;
+ALTER PLUGGABLE DATABASE SWB1 OPEN;
 ```
 **NOTE** Pluggable database opens with errors (as keys are missing) - this is expected.
 
@@ -172,14 +154,14 @@ The path to the keystore location is taken from the output of `v$encryption_wall
 
 Shutdown and Re-Open the the Pluggable Database:
 ``` {SQL}
-alter session set container = CDB$ROOT;
-alter pluggable database SWB1 close;
-alter pluggable database SWB1 open read write;
+ALTER SESSION SET CONTAINER = CDB$ROOT;
+ALTER PLUGGABLE DATABASE SWB1 CLOSE;
+ALTER PLUGGABLE DATABASE SWB1 OPEN READ WRITE;
 ```
 
 Check for errors:
 ``` {SQL}
-select * from PDB_PLUG_IN_VIOLATIONS order by 1;
+SELECT * FROM pdb_plug_in_violations ORDER BY 1;
 ```
 
 Close the Container Key-Store and Re-Open:
