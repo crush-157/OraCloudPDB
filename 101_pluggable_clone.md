@@ -7,7 +7,11 @@ To view the Seed Database Data-Files:
 ```{SQL}
 ALTER SESSION set exclude_seed_cdb_view = false;
 
-SELECT file_name from cdb_data_files
+SELECT file_name FROM cdb_data_files
+WHERE con_id = 2
+UNION
+SELECT file_name 
+FROM cdb_temp_files
 WHERE con_id = 2;
 ```
 
@@ -16,19 +20,57 @@ Specify the File Name Convert option to determine the location for the new PDB w
 ```{SQL}
 CREATE PLUGGABLE DATABASE pdb2 
 ADMIN USER pdb_adm IDENTIFIED BY welcome1
-FILE_NAME_CONVERT=('/oradata/ORCL/pdbseed/'
-                  ,'/oradata/ORCL/pdb2/');
+FILE_NAME_CONVERT=(  
+'/u02/app/oracle/oradata/ORCL/pdbseed/system01.dbf',  
+'/u02/app/oracle/oradata/ORCL/pdb2/system01.dbf',  
+'/u02/app/oracle/oradata/ORCL/pdbseed/sysaux01.dbf',  
+'/u02/app/oracle/oradata/ORCL/pdb2/sysaux01.dbf',  
+'/u02/app/oracle/oradata/ORCL/29D627273C13166CE053D64EC40AC9E5/datafile/o1_mf_users_cl48t4c4_.dbf',  
+'/u02/app/oracle/oradata/ORCL/pdb2/users01.dbf',  
+'/u02/app/oracle/oradata/ORCL/pdbseed/pdbseed_temp012016-01-21_09-59-05-AM.dbf',  
+'/u02/app/oracle/oradata/ORCL/pdb2/temp01.dbf');  
 
 
 ALTER PLUGGABLE DATABASE pdb2 open READ WRITE;
 
 ```
+
 This copies the files into place.  The database should register with the listener automatically and be available as a TNS Service to connect to.
+
+To check the service name registered for this database, issue the following query:  
+
+```
+SELECT name 
+FROM v$services
+WHERE pdb = 'PDB2';
+
+NAME
+----------------------------------------------------------------
+pdb2.gse00000379.oraclecloud.internal
+
+
+```
+Note the PDB name identifier has to be supplied in upper-case.
+
+A TNS client entry can then be created to connect to this container database - an example is shown below:
+
+```
+ORCL.PDB2 =
+  (DESCRIPTION =
+    (ADDRESS = (PROTOCOL = TCP)(HOST = 192.168.101.1)(PORT = 1521))
+    (CONNECT_DATA =
+      (SERVER = DEDICATED)
+      (SERVICE_NAME = pdb2.gse00000379.oraclecloud.internal)
+    )
+  )
+
+```
 
 Common Users from the CDB will be available in this database.
 
 If **Apex (Oracle Application Express) is installed** in the cdb$ROOT then this will get copied to the PDB.  **See the following blog entry**:
 https://blogs.oracle.com/UPGRADE/entry/apex_in_pdb_does_not
+
 
 ## Drop a Pluggable Database ##
 
