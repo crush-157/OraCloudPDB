@@ -129,7 +129,7 @@ CLOSED                         UNKNOWN
 Next, **Open the Key Store** so that both the Container and Target PDB Wallets are open as PASSWORD-authenticated key-stores:
 
 ``` {SQL}
-ADMINISTER KEY MANAGEMENT SET KEYSTORE OPEN IDENTIFIED BY Welcome1_;
+ADMINISTER KEY MANAGEMENT SET KEYSTORE OPEN IDENTIFIED BY "welcome1";
 ```
 
 Then **Import the Wallet Key** to the Target PDB:
