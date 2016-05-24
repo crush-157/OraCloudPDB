@@ -80,6 +80,129 @@ DROP PLUGGABLE DATABASE pdb2 including datafiles;
 ```
 
 
+## Clone a Pluggable Database ##
+
+This example is for cloning one Pluggable Database - source **PDB1** in this example, and creating a clone copy (including all data, users etc) - target **NEW_PDB** in this example. 
+
+All the SQL operations listed below are executed in the container **root database** as a DBA user with SYSDBA privileges.
+
+Switch to working in the root container:
+
+``` {SQL}
+ALTER SESSION SET CONTAINER = CDB$ROOT;
+```
+
+Check files and file-location involved in the clone operation:
+
+``` {SQL}
+
+SELECT tablespace_name, file_name 
+FROM cdb_data_files f, dba_pdbs p
+WHERE f.con_id = p.pdb_id
+AND p.pdb_name = 'PDB1'
+UNION
+SELECT tablespace_name, file_name 
+FROM cdb_temp_files f, dba_pdbs p
+WHERE f.con_id = p.pdb_id
+AND p.pdb_name = 'PDB1';
+
+```
+
+In Oracle 12.1 the source database being cloned has to be set read-only: 
+
+``` {SQL}
+ALTER PLUGGABLE DATABASE "PDB1" CLOSE IMMEDIATE;
+
+ALTER PLUGGABLE DATABASE "PDB1" OPEN READ ONLY;
+
+```
+
+Create the new pluggable database as a copy of "PDB1" in the same Container Database.   This example explicitly maps the location of new data-files with respect to their old source data-files using `FILE_NAME_CONVERT`: 
+
+``` {SQL}
+CREATE PLUGGABLE DATABASE "NEW_PDB" FROM "PDB1"
+STORAGE UNLIMITED TEMPFILE REUSE
+FILE_NAME_CONVERT=(
+'/u02/app/oracle/oradata/EDDB/PDB1/users01.dbf',
+'/u02/app/oracle/oradata/EDDB/NEW_PDB/users01.dbf',
+'/u02/app/oracle/oradata/EDDB/PDB1/system01.dbf',
+'/u02/app/oracle/oradata/EDDB/NEW_PDB/system01.dbf',
+'/u02/app/oracle/oradata/EDDB/PDB1/temp01.dbf',
+'/u02/app/oracle/oradata/EDDB/NEW_PDB/temp01dbf',
+'/u02/app/oracle/oradata/EDDB/PDB1/sysaux01.dbf',
+'/u02/app/oracle/oradata/EDDB/NEW_PDB/temp01.dbf'
+);
+
+```
+
+Restart the Source PDB1 database so that it is open for read-write activity again:
+
+``` {SQL}
+ALTER PLUGGABLE DATABASE "PDB1" CLOSE IMMEDIATE;
+
+ALTER PLUGGABLE DATABASE "PDB1" OPEN READ WRITE;
+```
+
+If the source pluggable database (PDB1) was **[TDE Encrypted](http://www.oracle.com/technetwork/database/options/advanced-security/index-099011.html)** then it is necessary to export TDE encryption keys and import them to the new clone ("NEW_PDB").  
+
+All **Oracle Cloud** database have **TDE Encryption enabled by default**, so this step will need to be followed for pluggable database clone operations with Oracle Cloud databases. 
+
+See this [link for exporting and importing TDE encrpytion keys](https://github.com/edbullen/OraCloudPDB/blob/master/101_pluggable_TDE_import.md).  The new cloned pluggable database can now be opened:
+
+``` {SQL}
+ALTER PLUGGABLE DATABASE "NEW_PDB" CLOSE IMMEDIATE;
+
+ALTER PLUGGABLE DATABASE "NEW_PDB" OPEN READ WRITE;
+```
+
+Check for any plug-in violations:
+
+``` {SQL}
+set linesize 200
+SELECT time || ' ' || name || ' ' || message || ' ' || action
+FROM pdb_plug_in_violations
+ORDER BY time;
+```
+
+#### Identifiy new Network Service to Connect to ####
+
+Finally, identify the name of the new service that will be automatically registered with the database network listener:
+
+``` {SQL}
+--switch to the new Pluggable (container) Database
+ALTER SESSION SET CONTAINER = NEW_PDB;
+-- Find the name of the service that has been registered
+SELECT NAME FROM v$services;
+```
+
+Sample Output:
+
+```
+new_pdb.gse00000379.oraclecloud.internal
+```
+
+Example - SQL EZ Connect
+
+```
+sqlplus system/welcome1//128.168.101.1:1521/new_pdb.gse00000379.oraclecloud.internal
+```
+
+
+Example - tnsnames.ora entry
+
+```
+MYCONTAINER.NEW_PDB =
+  (DESCRIPTION =
+    (ADDRESS = (PROTOCOL = TCP)(HOST = 192.168.101.1)(PORT = 1521))
+    (CONNECT_DATA =
+      (SERVER = DEDICATED)
+      (SERVICE_NAME = new_pdb.gse00000379.oraclecloud.internal)
+    )
+  )
+
+```
+
+
 ## UnPlug a PDB, Copy and Clone to Remote CDB ##
 
 In 12.1.0.2 this is an off-line operation.
