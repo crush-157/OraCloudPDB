@@ -249,3 +249,54 @@ FROM pdb_plug_in_violations
 ORDER BY time;
 
 ```
+
+### Create a PDB - Clone from Seed Database ###
+
+In this example, create a new PDB called `SWB1`:
+
+```{SQL}
+CREATE PLUGGABLE DATABASE swb1 admin user swb1admin identified by welcome1
+roles = (DBA)
+FILE_NAME_CONVERT = (
+    '/u02/app/oracle/oradata/ORCL/pdbseed',
+    '/u02/app/oracle/oradata/ORCL/SWB1',
+    '/u04/app/oracle/oradata/temp/pdbseed_temp012016-09-12_07-35-13-AM.dbf',
+    '/u02//app/oracle/oradata/ORCL/SWB1/temp01.dbf')
+```
+
+Then open the PDB database:
+
+```
+alter pluggable database SWB1 open READ WRITE
+```
+
+For TDE Encrypted environments, you will get the following error when you try to create a new tablespace:
+
+```The following statement failed : create tablespace ... ORA-28374: typed master key not found in wallet```
+
+** Extra Step Required for TDE Encrypted Databases **
+
+```
+alter session set container=cdb$root;
+
+administer key management set keystore close;
+
+administer key management set keystore open identified by welcome1 container=all;
+
+alter session set container=SWB1;
+
+ADMINISTER KEY MANAGEMENT SET KEY USING TAG  "tde_dbaas" identified by welcome1   
+WITH BACKUP USING "tde_dbaas_bkup";
+
+set linesize 120
+column WRL_PARAMETER format a40
+SELECT WRL_PARAMETER,STATUS,WALLET_TYPE FROM V$ENCRYPTION_WALLET;
+
+
+WRL_PARAMETER                            STATUS                         WALLET_TYPE
+---------------------------------------- ------------------------------ --------------------
+/u01/app/oracle/admin/CSDEMO/tde_wallet/ OPEN                           PASSWORD
+
+```
+
+Re-Try the Create Tablespace command - it should now work.
